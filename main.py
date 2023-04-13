@@ -1,4 +1,3 @@
-
 ##### Author - Nilesh Chopda
 
 ##### Project - Traffic Light Detection and Color Recognition using Tensorflow Object Detection API
@@ -11,18 +10,17 @@ import os
 import six.moves.urllib as urllib
 import tarfile
 import tensorflow as tf
-from matplotlib import pyplot as plt
 from PIL import Image
 from os import path
 from utils import label_map_util
 from utils import visualization_utils as vis_util
 import time
 import cv2
-
+import tensorflow.compat.v1 as tf
 
 ### Function To Detect Red and Yellow Color
 # Here,we are detecting only Red and Yellow colors for the traffic lights as we need to stop the car when it detects these colors.
-
+tf.disable_v2_behavior()
 def detect_red_and_yellow(img, Threshold=0.01):
     """
     detect red and yellow
@@ -31,7 +29,7 @@ def detect_red_and_yellow(img, Threshold=0.01):
     :return:
     """
 
-    desired_dim = (30, 90)  # width, height
+    desired_dim = (600, 400)  # width, height
     img = cv2.resize(np.array(img), desired_dim, interpolation=cv2.INTER_LINEAR)
     img_hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
 
@@ -66,9 +64,7 @@ def detect_red_and_yellow(img, Threshold=0.01):
 ### Loading Image Into Numpy Array
 
 def load_image_into_numpy_array(image):
-    (im_width, im_height) = image.size
-    return np.array(image.getdata()).reshape(
-        (im_height, im_width, 3)).astype(np.uint8)
+    return image
 
 
 ### Read Traffic Light objects
@@ -95,7 +91,6 @@ def read_traffic_lights_object(image, boxes, scores, classes, max_boxes_to_draw=
 
 def plot_origin_image(image_np, boxes, classes, scores, category_index):
     # Size of the output images.
-    IMAGE_SIZE = (12, 8)
     vis_util.visualize_boxes_and_labels_on_image_array(
         image_np,
         np.squeeze(boxes),
@@ -105,12 +100,9 @@ def plot_origin_image(image_np, boxes, classes, scores, category_index):
         min_score_thresh=.5,
         use_normalized_coordinates=True,
         line_thickness=3)
-    plt.figure(figsize=IMAGE_SIZE)
-    plt.imshow(image_np)
-
+    return image_np
     # save augmented images into hard drive
     # plt.savefig( 'output_images/ouput_' + str(idx) +'.png')
-    plt.show()
 
 
 ### Function to Detect Traffic Lights and to Recognize Color
@@ -179,34 +171,29 @@ def detect_traffic_lights(PATH_TO_TEST_IMAGES_DIR, MODEL_NAME, Num_images, plot_
             detection_classes = detection_graph.get_tensor_by_name('detection_classes:0')
             num_detections = detection_graph.get_tensor_by_name('num_detections:0')
 
-            for image_path in TEST_IMAGE_PATHS:
-                image = Image.open(image_path)
 
-                # the array based representation of the image will be used later in order to prepare the
-                # result image with boxes and labels on it.
-                image_np = load_image_into_numpy_array(image)
-                # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
-                image_np_expanded = np.expand_dims(image_np, axis=0)
-                # Actual detection.
-                (boxes, scores, classes, num) = sess.run(
-                    [detection_boxes, detection_scores, detection_classes, num_detections],
-                    feed_dict={image_tensor: image_np_expanded})
 
-                stop_flag = read_traffic_lights_object(image, np.squeeze(boxes), np.squeeze(scores),
-                                                       np.squeeze(classes).astype(np.int32))
-                if stop_flag:
-                    # print('{}: stop'.format(image_path))  # red or yellow
-                    commands.append(False)
-                    cv2.putText(image_np, 'Stop', (15, 25), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1)
-                else:
-                    # print('{}: go'.format(image_path))
-                    commands.append(True)
-                    cv2.putText(image_np, 'Go', (15, 25), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 1)
+            cap = cv2.VideoCapture(0)
+            if cap.isOpened():
+                while True:
+                    ret, img = cap.read()
+                    if ret:
+                        # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
+                        image_np_expanded = np.expand_dims(img, axis=0)
+                        # Actual detection.
+                        (boxes, scores, classes, num) = sess.run(
+                            [detection_boxes, detection_scores, detection_classes, num_detections],
+                            feed_dict={image_tensor: image_np_expanded})
+                        # Visualization of the results of a detection.
 
-                # Visualization of the results of a detection.
-                if plot_flag:
-                    plot_origin_image(image_np, boxes, classes, scores, category_index)
+                        g = plot_origin_image(img, boxes, classes, scores, category_index)
+                        cv2.imshow("asd", g)
+                        cv2.waitKey(33)
+                    else:
+                        break
 
+
+                cap.release()
     return commands
 
 
@@ -224,9 +211,5 @@ if __name__ == "__main__":
     MODEL_NAME = 'faster_rcnn_resnet101_coco_11_06_2017'  # for improved accuracy
 
     commands = detect_traffic_lights(PATH_TO_TEST_IMAGES_DIR, MODEL_NAME, Num_images, plot_flag=True)
-    print(commands)  # commands to print action type, for 'Go' this will return True and for 'Stop' this will return False
 
-
-
-
-
+cv2.destroyAllWindow()
